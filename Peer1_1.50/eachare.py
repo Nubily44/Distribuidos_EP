@@ -4,7 +4,6 @@ import os
 import time 
 import sys
 
-
 CLOCK = 0
 
 SELF_IP = None
@@ -73,7 +72,7 @@ def listener():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((SELF_IP, int(SELF_PORT)))
     server.listen(5)
-haiii
+
     while True:
         conn, addr = server.accept()
         data = conn.recv(1024).decode()
