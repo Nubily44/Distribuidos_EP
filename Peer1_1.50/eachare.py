@@ -4,11 +4,18 @@ import os
 import time 
 import sys
 
+<<<<<<< HEAD
 SELF_IP = "127.0.0.1"
 SELF_PORT = 5000
 SELF_CLOCK = 0
 
 vizinhos = set()
+=======
+CLOCK = 0
+
+SELF_IP = None
+SELF_PORT = None
+>>>>>>> b4f29885e373fbe0af24b1b6d591d261a9179892
 
 class Vizinho:
     def __init__(self, iden, ip, port, status):
