@@ -1,3 +1,6 @@
+# Code by Lily and Dani (14567051 e 13659997)
+# Windows 10, Python 3.11.5
+
 import socket
 import threading
 import os
@@ -11,15 +14,12 @@ SELF_CLOCK = 0
 
 vizinhos = set()
 
-CLOCK = 0
+sair = False
 
-SELF_IP = None
-SELF_PORT = None
-
-
+# Classe vizinho para armazenar os peers
 class Vizinho:
     def __init__(self, iden, ip, port, status):
-        self.iden = iden
+        self.iden = iden # Indentificador do vizinho
         self.ip = ip
         self.port = port
         self.status = status
@@ -31,20 +31,24 @@ class Vizinho:
         return self.status
     
     def __hash__ (self):
-        return hash((self.iden))
+        return hash((self.iden)) # Hash para o set de vizinhos
 
-    def __eq__(self, other):
+    def __eq__(self, other): # Comparador para o set de vizinhos
         if isinstance(other, Vizinho):
             return self.iden == other.iden and self.ip == other.ip and self.port == other.port
         return False
 
-
+# Busca de vizinho pelo identificador
+# (usado para enviar mensagens para vizinhos)
 def searchVizinho(vizinhos, iden):
     return next((v for v in vizinhos if v.iden == iden), None)
 
+# Busca de vizinho pelo IP e porta
+# (usado para responder mensagens de vizinhos)
 def searchVizinhoIP(vizinhos, ip, port):
     return next((v for v in vizinhos if v.ip == ip and v.port == port), None)
 
+# Atualiza o status do vizinho (com a busca pelo iden)
 def updateStatus(vizinhos, iden, newStatus):
     vizinho = searchVizinho(vizinhos, iden)
     if vizinho:
@@ -54,13 +58,13 @@ def updateStatus(vizinhos, iden, newStatus):
     
     print(f"Atualizando peer {vizinho.ip}:{vizinho.port} para {newStatus}")
 
-
+# Da update do clock proprio quando necessario
 def updateClock():
     global SELF_CLOCK
     SELF_CLOCK += 1
     print(f"=> Atualizando relogio para {SELF_CLOCK}")
 
-
+# Função de formatação de mensagens e envio. Padrão para TODAS AS MENSAGENS
 def sendMessage(iden, tipo, arguments):
     try:
 
@@ -80,6 +84,7 @@ def sendMessage(iden, tipo, arguments):
     except Exception as e:
         return e
 
+# Interpreter de mensagens recebidas. Cada tipo de mensagem tem um tratamento diferente.
 def interpreter(vizinhos, ip, port, tipo, arguments):
     if not arguments:
         arguments = ""
@@ -124,35 +129,40 @@ def interpreter(vizinhos, ip, port, tipo, arguments):
                     vizinhos.add(v)
                     print(f"Adicionando novo peer {v.ip}:{v.port} status {v.status}")
 
-
+# Thread de escuta para receber mensagens de outros peers
 def listener():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((SELF_IP, int(SELF_PORT)))
-    server.listen(5)
+    listen = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen.bind((SELF_IP, int(SELF_PORT)))
+    listen.listen(5)
+    listen.settimeout(1)
+    while not sair:
+        try:
+            conn, addr = listen.accept()
+            data = conn.recv(1024).decode()
 
-    while True:
-        conn, addr = server.accept()
-        data = conn.recv(1024).decode()
+            vizinho_ip_port, peer_clock, tipo, *arguments = data.split()
 
-        vizinho_ip_port, peer_clock, tipo, *arguments = data.split()
+            if tipo == "PEER_LIST":
+                print(f"Resposta recebida: \"{data}\"") # Sintaxe diferente para Obter peers (porque é uma resposta)
+            else:
+                print(f"Mensagem recebida: \"{data}\"")
 
-        if tipo == "PEER_LIST":
-            print(f"Resposta recebida: \"{data}\"")
-        else:
-            print(f"Mensagem recebida: \"{data}\"")
-
-        
-        vizinho_ip, vizinho_port = vizinho_ip_port.split(":")
-        if arguments:
-            interpreter(vizinhos, vizinho_ip, vizinho_port, tipo, arguments)
-        else:
-            interpreter(vizinhos, vizinho_ip, vizinho_port, tipo, "")
-
-
-        conn.close()
+            
+            vizinho_ip, vizinho_port = vizinho_ip_port.split(":")
+            if arguments:
+                interpreter(vizinhos, vizinho_ip, vizinho_port, tipo, arguments) # Com argumentos
+            else:
+                interpreter(vizinhos, vizinho_ip, vizinho_port, tipo, "")  # Sem argumentos
 
 
-def sendHello(iden):
+            conn.close()
+
+        except socket.timeout:
+            pass
+
+
+
+def sendHello(iden): # Listar peers e enviar hello para o vizinho
     tipo = "HELLO"
     vizinho = searchVizinho(vizinhos, iden)
     
@@ -165,7 +175,7 @@ def sendHello(iden):
         print(f"Erro ao enviar mensagem para {vizinho.ip}:{str(vizinho.port)}")
         updateStatus(vizinhos, vizinho.iden, "OFFLINE")
 
-def getPeers(vizinhos):
+def getPeers(vizinhos): # Obter peers e enviar mensagem para todos os vizinhos
     tipo = "GET_PEERS"
     for i in list(vizinhos):
         updateClock()
@@ -176,9 +186,9 @@ def getPeers(vizinhos):
             print(f"Erro ao enviar mensagem para {i.ip}:{str(i.port)}")
             updateStatus(vizinhos, i.iden, "OFFLINE")
     
-    time.sleep(1)
+    time.sleep(1) # IMPROVISO (GAMBIARRA) :D / Pra esperar a resposta do peer. Se vc ta lendo isso, oie! :)
 
-def sendBye(iden):
+def sendBye(iden): # Enviar mensagem de bye para o vizinho
     tipo = "BYE"
     sendMessage(iden, tipo, "")
 
@@ -191,6 +201,8 @@ def console():
 
 if __name__ == "__main__":
 
+
+    # Execução do programa
     if len(sys.argv) != 3:
         print("Uso: python eachare.py <selfIP> <vizinhos> ")
         sys.exit
@@ -199,14 +211,18 @@ if __name__ == "__main__":
     vizinhos_filename = sys.argv[2]
     folder_name = sys.argv[3]  
 
+
+    # Inicializa o socket e a thread de escuta
     listen_thread = threading.Thread(target=listener)
     listen_thread.start()
 
+    # Checa se o diretorio existe
     script_dir = os.path.dirname(os.path.abspath(__file__))  
     folder_path = os.path.join(script_dir, folder_name)
     if not os.path.exists(folder_path):
-        os._exit(0)
+        sys.exit
 
+    # Armazena os peers atuais
     vizinhos_ips = openFile(vizinhos_filename).split("\n")
 
     temp = 1
@@ -261,6 +277,8 @@ if __name__ == "__main__":
                 for i in vizinhos:
                     sendBye(i.iden)
                 interface = 1
-                os._exit(0)
+                sair = True
+                listen_thread.join()
+                sys.exit
             
 
