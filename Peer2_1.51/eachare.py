@@ -4,10 +4,18 @@ import os
 import time 
 import sys
 
-SELF_IP = "127.0.0.1"
-SELF_PORT = 5001
+
+SELF_IP = ""
+SELF_PORT = None
+SELF_CLOCK = 0
 
 vizinhos = set()
+
+CLOCK = 0
+
+SELF_IP = None
+SELF_PORT = None
+
 
 class Vizinho:
     def __init__(self, iden, ip, port, status):
@@ -15,7 +23,6 @@ class Vizinho:
         self.ip = ip
         self.port = port
         self.status = status
-        self.clock = 0
 
     def setStatus(self, status):
         self.status = status
@@ -48,27 +55,24 @@ def updateStatus(vizinhos, iden, newStatus):
     print(f"Atualizando peer {vizinho.ip}:{vizinho.port} para {newStatus}")
 
 
-def updateClock(vizinhos, iden):
-    vizinho = searchVizinho(vizinhos, iden)
-    if vizinho:
-        vizinhos.remove(vizinho)
-        vizinho.clock += 1
-        vizinhos.add(vizinho)
-
-    print(f"=> Atualizando relogio para {vizinho.clock}")
+def updateClock():
+    global SELF_CLOCK
+    SELF_CLOCK += 1
+    print(f"=> Atualizando relogio para {SELF_CLOCK}")
 
 
-def sendMessage(iden, clock, tipo, arguments):
+def sendMessage(iden, tipo, arguments):
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        vizinho = searchVizinho(vizinhos, iden)
-        sock.connect((vizinho.ip, vizinho.port))
 
+        vizinho = searchVizinho(vizinhos, iden)
         self_ip_full = ":".join ([SELF_IP, str(SELF_PORT)])
-        full_message = " ".join([self_ip_full, str(clock), tipo, arguments])
+        full_message = " ".join([self_ip_full, str(SELF_CLOCK), tipo, arguments])
 
         print(f"Encaminhando mensagem \"{full_message}\" para {vizinho.ip}:{str(vizinho.port)}")
 
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((vizinho.ip, vizinho.port))
         sock.sendall(full_message.encode())
 
         sock.close()
@@ -85,31 +89,40 @@ def interpreter(vizinhos, ip, port, tipo, arguments):
     match tipo:
         case "HELLO":
             if vizinho:
-                updateClock(vizinhos, vizinho.iden)
+                updateClock()
                 updateStatus(vizinhos, vizinho.iden, "ONLINE")
 
             else:
-                print(f"Novo peer {ip}:{port} encontrado")
                 vizinho = Vizinho(len(vizinhos)+1, ip, int(port), "ONLINE")
                 vizinhos.add(vizinho)
-                print(f"Adicionando novo peer {vizinho.ip}:{vizinho.port}")
-                updateClock(vizinhos, vizinho.iden)
+                print(f"\nAdicionando novo peer {vizinho.ip}:{vizinho.port}")
+                updateClock()
 
         case "BYE":
             if vizinho:
+                updateClock()
                 updateStatus(vizinhos, vizinho.iden, "OFFLINE")
         
         case "GET_PEERS":
+            updateClock()
             lista = []
             lista.append(str(len(vizinhos)-1))
             for i in vizinhos:
                 if i != vizinho:
                     lista.append(f"{i.ip}:{str(i.port)}:{i.status}:0")
             args = " ".join(lista)
-            sendMessage(vizinho.iden, vizinho.clock, "PEER_LIST", args)
+            sendMessage(vizinho.iden, "PEER_LIST", args)
+        
+        case "PEER_LIST":
+            updateClock()
+            for i in arguments[1:]:
+                ph = i.split(":")
+                ip, port, status = ph[0], int(ph[1]), ph[2]
 
-            
-
+                if searchVizinhoIP(vizinhos, ip, port) is None:
+                    v = Vizinho(len(vizinhos) + 1, ip, port, status)
+                    vizinhos.add(v)
+                    print(f"Adicionando novo peer {v.ip}:{v.port} status {v.status}")
 
 
 def listener():
@@ -120,8 +133,15 @@ def listener():
     while True:
         conn, addr = server.accept()
         data = conn.recv(1024).decode()
-        print(f"\nMensagem recebida: {data}")
-        vizinho_ip_port, clock, tipo, *arguments = data.split()
+
+        vizinho_ip_port, peer_clock, tipo, *arguments = data.split()
+
+        if tipo == "PEER_LIST":
+            print(f"Resposta recebida: \"{data}\"")
+        else:
+            print(f"Mensagem recebida: \"{data}\"")
+
+        
         vizinho_ip, vizinho_port = vizinho_ip_port.split(":")
         if arguments:
             interpreter(vizinhos, vizinho_ip, vizinho_port, tipo, arguments)
@@ -133,59 +153,60 @@ def listener():
 
 
 def sendHello(iden):
-    vizinho = searchVizinho(vizinhos, iden)
     tipo = "HELLO"
-    if sendMessage(vizinho.iden, vizinho.clock, tipo, "") == 1:
-
-        updateClock(vizinhos, vizinho.iden)
-
+    vizinho = searchVizinho(vizinhos, iden)
+    
+    updateClock()
+    result = sendMessage(vizinho.iden, tipo, "")
+    if result == 1:
         updateStatus(vizinhos, vizinho.iden, "ONLINE")
 
-    else: 
-        print(sendMessage(vizinho.iden, vizinho.clock, tipo, ""))
+    else:
         print(f"Erro ao enviar mensagem para {vizinho.ip}:{str(vizinho.port)}")
         updateStatus(vizinhos, vizinho.iden, "OFFLINE")
 
 def getPeers(vizinhos):
-    for i in vizinhos:
-        sendMessage(i.iden, i.clock, "GET_PEERS", "")
+    tipo = "GET_PEERS"
+    for i in list(vizinhos):
+        updateClock()
+        result = sendMessage(i.iden, tipo, "")
+        if result == 1:
+            updateStatus(vizinhos, i.iden, "ONLINE")
+        else:
+            print(f"Erro ao enviar mensagem para {i.ip}:{str(i.port)}")
+            updateStatus(vizinhos, i.iden, "OFFLINE")
+    
+    time.sleep(1)
 
 def sendBye(iden):
-    vizinho = searchVizinho(vizinhos, iden)
-    sendMessage(iden, vizinho.clock, "BYE", "")
-
-
-
-
+    tipo = "BYE"
+    sendMessage(iden, tipo, "")
 
 def openFile(path):
     with open(path, 'r') as file:
         return file.read()
 
-    
-
-
+def console():
+    print("> ")
 
 if __name__ == "__main__":
-    print("Iniciando o programa...\n")
 
-    #if len(sys.argv) != 3:
-    #    print("Usage: python3 eachare.py <selfIP> <vizinhos> ")
-    #    sys.exit
-    #selfIP = sys.argv[1]
-    #vizinhos_filename = sys.argv[2]
-    
+    if len(sys.argv) != 3:
+        print("Uso: python eachare.py <selfIP> <vizinhos> ")
+        sys.exit
+    selfIP = sys.argv[1]
+    SELF_IP, SELF_PORT = selfIP.split(":")
+    vizinhos_filename = sys.argv[2]
+    folder_name = sys.argv[3]  
+
     listen_thread = threading.Thread(target=listener)
     listen_thread.start()
 
-    folder_name = "dir"  
     script_dir = os.path.dirname(os.path.abspath(__file__))  
     folder_path = os.path.join(script_dir, folder_name)
     if not os.path.exists(folder_path):
         os._exit(0)
 
-
-    vizinhos_filename = "vizinhos.txt"
     vizinhos_ips = openFile(vizinhos_filename).split("\n")
 
     temp = 1
@@ -217,7 +238,7 @@ if __name__ == "__main__":
                       "[0] voltar para o menu anterior")
                 
                 for i in vizinhos:
-                    print(f"[{str(i.iden)}] " + i.ip + ":" + str(i.port) + " - " + i.status + " - " + "(clock: " + str(i.clock) + ")")
+                    print(f"[{str(i.iden)}] {i.ip}:{str(i.port)} {i.status}")
                 
                 input1 = input("> ")
                 if input1 == "0":
@@ -229,9 +250,6 @@ if __name__ == "__main__":
                 getPeers(vizinhos)    
             
             case 3:
-
-                
-
                 if os.path.exists(folder_path) and os.path.isdir(folder_path):
                     contents = os.listdir(folder_path)
                     print(contents)
