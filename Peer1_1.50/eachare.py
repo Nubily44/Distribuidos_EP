@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
 
     # Execução do programa
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         print("Uso: python eachare.py <selfIP> <vizinhos> ")
         sys.exit
     selfIP = sys.argv[1]
