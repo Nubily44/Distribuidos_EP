@@ -205,22 +205,18 @@ if __name__ == "__main__":
     # Execução do programa
     if len(sys.argv) != 4:
         print("Uso: python eachare.py <selfIP> <vizinhos> ")
-        sys.exit
+        sys.exit()
     selfIP = sys.argv[1]
     SELF_IP, SELF_PORT = selfIP.split(":")
     vizinhos_filename = sys.argv[2]
     folder_name = sys.argv[3]  
 
-
-    # Inicializa o socket e a thread de escuta
-    listen_thread = threading.Thread(target=listener)
-    listen_thread.start()
-
     # Checa se o diretorio existe
     script_dir = os.path.dirname(os.path.abspath(__file__))  
     folder_path = os.path.join(script_dir, folder_name)
     if not os.path.exists(folder_path):
-        sys.exit
+        print(f"O diretório '{folder_name}' não existe.")
+        sys.exit()
 
     # Armazena os peers atuais
     vizinhos_ips = openFile(vizinhos_filename).split("\n")
@@ -232,6 +228,10 @@ if __name__ == "__main__":
         vizinhos.add(v)
         temp += 1
         print(f"Adicionando vizinho {v.ip}:{v.port}")
+
+    # Inicializa o socket e a thread de escuta
+    listen_thread = threading.Thread(target=listener)
+    listen_thread.start()
 
     print("\n\n\n")
     interface = 0
@@ -279,6 +279,6 @@ if __name__ == "__main__":
                 interface = 1
                 sair = True
                 listen_thread.join()
-                sys.exit
+                sys.exit()
             
 
