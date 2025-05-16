@@ -333,10 +333,11 @@ def getPeers(vizinhos): # Obter peers e enviar mensagem para todos os vizinhos
         result = sendMessage(i.iden, tipo, "")
         if result == 1:
             updateStatus(vizinhos, i.iden, "ONLINE")
+            event.wait()
         else:
             print(f"Erro ao enviar mensagem para {i.ip}:{str(i.port)}")
             updateStatus(vizinhos, i.iden, "OFFLINE")
-        event.wait()
+        
 
 def sendLS(vizinhos): # Enviar mensagem de listagem de arquivos para o vizinho
     tipo = "LS"
@@ -345,10 +346,11 @@ def sendLS(vizinhos): # Enviar mensagem de listagem de arquivos para o vizinho
         result = sendMessage(i.iden, tipo, "")
         if result == 1:
             updateStatus(vizinhos, i.iden, "ONLINE")
+            event.wait()
         else:
             print(f"Erro ao enviar mensagem para {i.ip}:{str(i.port)}")
             updateStatus(vizinhos, i.iden, "OFFLINE")
-        event.wait()
+        
 
 def sendBye(iden): # Enviar mensagem de bye para o vizinho
     tipo = "BYE"
