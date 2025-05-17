@@ -132,14 +132,22 @@ def listarArquivosRede():
 
     print(f"{' ' * (id_width + 3)}{ 'Nome'.ljust(nome_width) } | { 'Tamanho'.rjust(tamanho_width) } | { 'Peer'.ljust(peer_width) }")
 
+    
+
     for i in todos:
+        if i.iden == 0:
+            temp = i.peer_iden
+        else:
+            vizinho = searchVizinho(vizinhos, i.peer_iden)
+            temp = ":".join([str(vizinho.ip), str(vizinho.port)])
         print(
             f"[{str(i.iden).rjust(id_width)}] "
             f"{str(i.nome).ljust(nome_width)} | "
             f"{str(i.tamanho).rjust(tamanho_width)} | "
-            f"{str(i.peer_iden).ljust(peer_width)}"
+            f"{str(temp).ljust(peer_width)}"
         )
-
+        
+    
 #######################################################################################
 
 #SEND
