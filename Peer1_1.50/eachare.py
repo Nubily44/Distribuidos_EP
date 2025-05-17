@@ -253,6 +253,12 @@ def interpreter(vizinhos, ip, port, clock, tipo, arguments):
                 if (searchArqNome(arquivos_rede, nome) is None):  
                     arquivo = Arquivos(l, nome, tamanho, vizinho.iden)
                     arquivos_rede.append(arquivo)
+                else:
+                    arquivo = searchArqNome(arquivos_rede, nome)
+                    arquivo.tamanho = tamanho
+                    arquivo.peer_iden = vizinho.iden
+                
+                
             event.set()
         
         case "DL":
