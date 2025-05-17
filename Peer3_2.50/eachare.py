@@ -87,6 +87,9 @@ def searchVizinhoIP(vizinhos, ip, port):
 def searchArq(arquivos_rede, iden):
     return next((a for a in arquivos_rede if a.iden == iden), None)
 
+def searchArqNome(arquivos_rede, nome):
+    return next((a for a in arquivos_rede if a.nome == nome), None)
+
 # Atualiza o status do vizinho (com a busca pelo iden)
 def updateStatus(vizinhos, iden, newStatus):
     vizinho = searchVizinho(vizinhos, iden)
@@ -106,7 +109,6 @@ def addClock():
 # Update do clock para recebimentos (com relógio de lamport)
 def updateClock(iden, clock):
     global SELF_CLOCK
-    print(f"Comparando: {SELF_CLOCK} e {clock}")
     SELF_CLOCK = max(SELF_CLOCK, clock) + 1
     
     print(f"=> Atualizando relogio para {SELF_CLOCK}")
@@ -247,8 +249,16 @@ def interpreter(vizinhos, ip, port, clock, tipo, arguments):
             for l, i in enumerate(arguments, start=1):
                 ph = i.split(":")
                 nome, tamanho = ph[0], int(ph[1])
-                arquivo = Arquivos(l, nome, tamanho, vizinho.iden)
-                arquivos_rede.append(arquivo)
+                    
+                if (searchArqNome(arquivos_rede, nome) is None):  
+                    arquivo = Arquivos(l, nome, tamanho, vizinho.iden)
+                    arquivos_rede.append(arquivo)
+                else:
+                    arquivo = searchArqNome(arquivos_rede, nome)
+                    arquivo.tamanho = tamanho
+                    arquivo.peer_iden = vizinho.iden
+                
+                
             event.set()
         
         case "DL":
@@ -267,6 +277,7 @@ def interpreter(vizinhos, ip, port, clock, tipo, arguments):
             with open(os.path.join(SELF_PATH, nome), 'wb') as file:
                 file.write(bd)
                 print(f"Download do arquivo {nome} finalizado.\n")
+            event.set()
                 
                 
                             
@@ -333,10 +344,11 @@ def getPeers(vizinhos): # Obter peers e enviar mensagem para todos os vizinhos
         result = sendMessage(i.iden, tipo, "")
         if result == 1:
             updateStatus(vizinhos, i.iden, "ONLINE")
+            event.wait()
         else:
             print(f"Erro ao enviar mensagem para {i.ip}:{str(i.port)}")
             updateStatus(vizinhos, i.iden, "OFFLINE")
-        event.wait()
+        
 
 def sendLS(vizinhos): # Enviar mensagem de listagem de arquivos para o vizinho
     tipo = "LS"
@@ -345,10 +357,11 @@ def sendLS(vizinhos): # Enviar mensagem de listagem de arquivos para o vizinho
         result = sendMessage(i.iden, tipo, "")
         if result == 1:
             updateStatus(vizinhos, i.iden, "ONLINE")
+            event.wait()
         else:
             print(f"Erro ao enviar mensagem para {i.ip}:{str(i.port)}")
             updateStatus(vizinhos, i.iden, "OFFLINE")
-        event.wait()
+        
 
 def sendBye(iden): # Enviar mensagem de bye para o vizinho
     tipo = "BYE"
@@ -366,6 +379,7 @@ def sendDL(arq_iden, int1, int2):
     result = sendMessage(vizinho.iden, tipo, args)
     if result == 1:
         updateStatus(vizinhos, vizinho.iden, "ONLINE")
+        event.wait()
     else:
         print(f"Erro ao enviar mensagem para {vizinho.ip}:{str(vizinho.port)}")
         updateStatus(vizinhos, vizinho.iden, "OFFLINE")
